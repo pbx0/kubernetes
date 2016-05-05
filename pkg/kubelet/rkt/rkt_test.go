@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 	"time"
@@ -1601,13 +1602,20 @@ func TestGarbageCollect(t *testing.T) {
 
 		sort.Sort(sortedStringList(tt.expectedServiceFiles))
 		sort.Sort(sortedStringList(fakeOS.Removes))
+		sort.Sort(sortedStringList(fs.resetFailedUnits))
 
 		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
+		var expectedService []string
+		for _, f := range tt.expectedServiceFiles {
+			expectedService = append(expectedService, filepath.Base(f))
+		}
+		assert.Equal(t, expectedService, fs.resetFailedUnits, testCaseHint)
 
 		// Cleanup after each test.
 		cli.Reset()
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
+		fs.resetFailedUnits = []string{}
 		getter.pods = make(map[types.UID]*api.Pod)
 	}
 }

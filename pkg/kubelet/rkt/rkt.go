@@ -1236,7 +1236,7 @@ func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) 
 	return kubepod, nil
 }
 
-// GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
+// GetPods runs 'rkt list' to get the list of rkt pods.
 // Then it will use the result to construct a list of container runtime pods.
 // If all is false, then only running pods will be returned, otherwise all pods will be
 // returned.
@@ -1503,10 +1503,6 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 
 	glog.V(4).Infof("rkt: Garbage collecting triggered with policy %v", gcPolicy)
 
-	if err := r.systemd.ResetFailed(); err != nil {
-		glog.Errorf("rkt: Failed to reset failed systemd services: %v, continue to gc anyway...", err)
-	}
-
 	// GC all inactive systemd service files and pods.
 	files, err := r.os.ReadDir(systemdServiceDir)
 	if err != nil {
@@ -1548,8 +1544,14 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 			rktUUID := getRktUUIDFromServiceFileName(serviceName)
 			if _, ok := allPods[rktUUID]; !ok {
 				glog.V(4).Infof("rkt: No rkt pod found for service file %q, will remove it", serviceName)
-				if err := r.os.Remove(serviceFilePath(serviceName)); err != nil {
-					errlist = append(errlist, fmt.Errorf("rkt: Failed to remove service file %q: %v", serviceName, err))
+
+				if err := r.systemd.ResetFailedUnit(serviceName); err != nil {
+					glog.Warningf("rkt: Failed to reset the failed systemd service %q: %v", serviceName, err)
+				}
+				serviceFile := serviceFilePath(serviceName)
+
+				if err := r.os.Remove(serviceFile); err != nil {
+					errlist = append(errlist, fmt.Errorf("rkt: Failed to remove service file %q: %v", serviceFile, err))
 				}
 			}
 		}
@@ -1592,6 +1594,9 @@ func (r *Runtime) removePod(uuid string) error {
 
 	// GC systemd service files as well.
 	serviceName := makePodServiceFileName(uuid)
+	if err := r.systemd.ResetFailedUnit(serviceName); err != nil {
+		glog.Warningf("rkt: Failed to reset the failed systemd service %q: %v", serviceName, err)
+	}
 	if err := r.os.Remove(serviceFilePath(serviceName)); err != nil {
 		errlist = append(errlist, fmt.Errorf("rkt: Failed to remove service file %q for pod %q: %v", serviceName, uuid, err))
 	}
