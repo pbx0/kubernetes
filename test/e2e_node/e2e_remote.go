@@ -40,7 +40,13 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify a
 
 var sshOptionsMap map[string]string
 
-const archiveName = "e2e_node_test.tar.gz"
+const (
+	archiveName  = "e2e_node_test.tar.gz"
+	CNIRelease   = "8a936732094c0941e1543ef5d292a1f4fffa1ac5"
+	CNIDirectory = "cni"
+)
+
+var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
 
 var hostnameIpOverrides = struct {
 	sync.RWMutex
